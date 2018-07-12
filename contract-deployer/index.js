@@ -13,6 +13,7 @@ const pubKey = '';
 const privKey = '';
 const httpProvider = '';
 const contractsToDeploy = 3;
+const maxAllowableGasPrice = 1000000000;
 
 // ----------------------------------------------------------------------------
 // helper functions
@@ -25,34 +26,47 @@ async function asyncForLoop(count, callback) {
 }
 
 async function sendTransaction(params) {
-  const {address, key, data, web3, successLog, errorLog, addressLog} = params;
-  const gasPrice = await web3.eth.getGasPrice();
-  console.log('Gas price: ' + gasPrice);
+  const {num, address, key, data, web3, successLog, errorLog, addressLog, maxGasPrice} = params;
+  let logString = '';
+  logString = logString + 'Transaction #' + num + os.EOL;
+  let gasPrice = await web3.eth.getGasPrice();
+  logString = logString + 'Median gas price: ' + gasPrice + os.EOL;
+  if (gasPrice > maxGasPrice) {
+    gasPrice = maxGasPrice;
+    logString = logString + 'Median gas price exceeds the maximum allowable. Set gas price to: ' + gasPrice + os.EOL;
+  }
   const nonce = await web3.eth.getTransactionCount(address);
-  console.log('Nonce: ' + nonce);
-  const gasLimit = await web3.eth.estimateGas({from: address, data});
-  console.log('Gas limit: ' + gasLimit);
+  logString = logString + 'Nonce: ' + nonce + os.EOL;
+  let gasLimit = await web3.eth.estimateGas({from: address, data});
+  logString = logString + 'Gas limit: ' + gasLimit + os.EOL;
   const rawTx = {
     nonce,
     gasLimit,
-    gasPrice: Buffer.from(gasPrice, 'hex'),
+    gasPrice,
     data,
     from: address
   };
-  const privateKey = Buffer.from(key, 'hex');
   const tx = new Tx(rawTx);
-  tx.sign(privateKey);
+  tx.sign(Buffer.from(key, 'hex'));
   const serializedTx = tx.serialize().toString('hex');
-  await web3.eth.sendSignedTransaction('0x' + serializedTx)
-    .on('receipt', receipt => {
-      console.log('success');
-      successLog.write(JSON.stringify(receipt) + os.EOL);
+  console.log('Sending transaction #' + num);
+  try {
+    await web3.eth.sendSignedTransaction('0x' + serializedTx).on('receipt', receipt => {
+      logString = logString + 'Success: Transaction successfully mined:' + os.EOL;
+      logString = logString + JSON.stringify(receipt) + os.EOL;
+      logString = logString + '---------------------------------------' + os.EOL;
+      successLog.write(logString);
       addressLog.write(JSON.stringify(receipt.contractAddress).replace(/"/g, '') + os.EOL);
-    })
-    .on('error', (error) => {
-      console.log('error');
-      errorLog.write(error + os.EOL);
+      console.log('Success');
+      console.log('-------------------------');
     });
+  } catch (e) {
+    logString = logString + e + os.EOL;
+    logString = logString + '---------------------------------------' + os.EOL;
+    errorLog.write(logString);
+    console.log('Error');
+    console.log('-------------------------');
+  }
 }
 
 // ----------------------------------------------------------------------------
