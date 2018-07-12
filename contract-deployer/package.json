@@ -1,0 +1,12 @@
+{
+  "name": "contract-deployer",
+  "version": "1.0.0",
+  "description": "Small npm script for contract deploying",
+  "main": "index.js",
+  "author": "Arkadiy A.Davydov",
+  "license": "ISC",
+  "dependencies": {
+    "ethereumjs-tx": "^1.3.6",
+    "web3": "^1.0.0-beta.34"
+  }
+}
