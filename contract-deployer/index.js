@@ -103,7 +103,7 @@ async function sendTransactions(params) {
 
 const web3 = new Web3();
 web3.setProvider(new web3.providers.HttpProvider(httpProvider));
-const data = fs.readFileSync('contracts.bytecode').toString();
+const data = fs.readFileSync('contracts.bytecode').toString().replace(/(\n|\r)+$/, '');
 try {
   sendTransactions({
     address: publicKey,
