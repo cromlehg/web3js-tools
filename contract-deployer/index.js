@@ -1,4 +1,4 @@
-/* eslint-disable no-console, no-plusplus */
+/* eslint-disable no-console, no-plusplus, no-constant-condition */
 
 const fs = require('fs');
 const Web3 = require('web3');
@@ -51,6 +51,20 @@ function createLogStream() {
   };
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getTransactionReceipt(web3, transactionHash) {
+  while (true) {
+    const receipt = await web3.eth.getTransactionReceipt(transactionHash);
+    if (receipt) {
+      return receipt;
+    }
+    await sleep(4000);
+  }
+}
+
 async function sendTransaction(params) {
   const {num, minGasPrice, maxGasPrice, address, key, data, web3, logStream} = params;
   const nonce = params.nonce + num;
@@ -79,12 +93,19 @@ async function sendTransaction(params) {
   const tx = new Tx(rawTx);
   tx.sign(Buffer.from(key, 'hex'));
   const serializedTx = tx.serialize().toString('hex');
+  const hash = '0x' + tx.hash().toString('hex');
   try {
     await web3.eth.sendSignedTransaction('0x' + serializedTx).on('receipt', receipt => {
       log.success(receipt);
     });
   } catch (e) {
-    log.error(e);
+    if (e.message.search(/Failed to check for transaction receipt/) !== -1) {
+      log.write('Warning: Failed to check for transaction receipt. Using fallback function.');
+      const receipt = await getTransactionReceipt(web3, hash);
+      log.success(receipt);
+    } else {
+      log.error(e);
+    }
   }
 }
 
@@ -118,4 +139,4 @@ try {
   console.log(e);
 }
 
-/* eslint-enable no-console, no-plusplus */
+/* eslint-enable no-console, no-plusplus, no-constant-condition */
