@@ -1,0 +1,12 @@
+{
+  "name": "register-callback",
+  "version": "1.0.0",
+  "description": "Small npm script for calling registerCallback method of given contract with the specified address list",
+  "main": "index.js",
+  "author": "Arkadiy A.Davydov",
+  "license": "ISC",
+  "dependencies": {
+    "ethereumjs-tx": "^1.3.6",
+    "web3": "^1.0.0-beta.34"
+  }
+}
