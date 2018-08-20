@@ -55,9 +55,20 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function promisify(inner) {
+  return new Promise((resolve, reject) =>
+    inner((err, res) => {
+      if (err) {
+        reject(err);
+      }
+      resolve(res);
+    })
+  );
+}
+
 async function getTransactionReceipt(web3, transactionHash) {
   while (true) {
-    const receipt = await web3.eth.getTransactionReceipt(transactionHash);
+    const receipt = await promisify(cb => web3.eth.getTransactionReceipt(transactionHash, cb));
     if (receipt) {
       return receipt;
     }
@@ -71,9 +82,9 @@ async function sendTransaction(params) {
   const log = logStream();
   log.write('Transaction #' + num);
   log.write('Nonce: ' + nonce);
-  const gasLimit = await web3.eth.estimateGas({from: address, data});
+  const gasLimit = await promisify(cb => web3.eth.estimateGas({from: address, data}, cb));
   log.write('Gas limit: ' + gasLimit);
-  let gasPrice = await web3.eth.getGasPrice();
+  let gasPrice = await promisify(cb => web3.eth.getGasPrice(cb));
   if (gasPrice > maxGasPrice) {
     gasPrice = maxGasPrice;
     log.write('Gas price oracle exceeds the maximum allowable. Setting gas price to:  ' + gasPrice);
@@ -93,26 +104,29 @@ async function sendTransaction(params) {
   const tx = new Tx(rawTx);
   tx.sign(Buffer.from(key, 'hex'));
   const serializedTx = tx.serialize().toString('hex');
-  const hash = '0x' + tx.hash().toString('hex');
+  // const hash = '0x' + tx.hash().toString('hex');
   try {
-    await web3.eth.sendSignedTransaction('0x' + serializedTx).on('receipt', receipt => {
-      log.success(receipt);
-    });
+    const hash = await promisify(cb => web3.eth.sendRawTransaction('0x' + serializedTx, cb));
+    const receipt = await getTransactionReceipt(web3, hash);
+    log.success(receipt);
+    //   .on('receipt', receipt => {
+    //   log.success(receipt);
+    // });
   } catch (e) {
-    if (e.message.search(/Failed to check for transaction receipt/) !== -1) {
-      log.write('Warning: Failed to check for transaction receipt. Using fallback function.');
-      const receipt = await getTransactionReceipt(web3, hash);
-      log.success(receipt);
-    } else {
-      log.error(e);
-    }
+    // if (e.message.search(/Failed to check for transaction receipt/) !== -1) {
+    //   log.write('Warning: Failed to check for transaction receipt. Using fallback function.');
+    //   const receipt = await getTransactionReceipt(web3, hash);
+    //   log.success(receipt);
+    // } else {
+    log.error(e);
+    // }
   }
 }
 
 async function sendTransactions(params) {
   const {address, key, minGasPrice, maxGasPrice, count, data, web3} = params;
   const logStream = createLogStream();
-  const nonce = await web3.eth.getTransactionCount(address);
+  const nonce = await promisify(cb => web3.eth.getTransactionCount(address, cb));
   for (let num = 0; num < count; num++) {
     sendTransaction({num, nonce, address, key, data, web3, minGasPrice, maxGasPrice, logStream});
   }
